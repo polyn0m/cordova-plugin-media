@@ -1,5 +1,4 @@
 /*
- *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  *
-*/
+ */
 
 /* global MediaError */
 
@@ -43,6 +42,7 @@ var Media = function(src, successCallback, errorCallback, statusCallback) {
     this.id = utils.createUUID();
     mediaObjects[this.id] = this;
     this.src = src;
+    this.numberOfLoops = 0;
     this.successCallback = successCallback;
     this.errorCallback = errorCallback;
     this.statusCallback = statusCallback;
@@ -50,7 +50,7 @@ var Media = function(src, successCallback, errorCallback, statusCallback) {
     this._position = -1;
 
     Media.onStatus(this.id, Media.MEDIA_STATE, Media.MEDIA_STARTING);
-    
+
     try {
         this.node = createNode(this);
     } catch (err) {
@@ -61,7 +61,7 @@ var Media = function(src, successCallback, errorCallback, statusCallback) {
 /**
  * Creates new Audio node and with necessary event listeners attached
  * @param  {Media} media Media object
- * @return {Audio}       Audio element 
+ * @return {Audio}       Audio element
  */
 function createNode (media) {
     var node = new Audio();
@@ -81,14 +81,21 @@ function createNode (media) {
     node.onerror = function (e) {
         // Due to media.spec.15 It should return MediaError for bad filename
         var err = e.target.error.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ?
-            { code: MediaError.MEDIA_ERR_ABORTED } :
+        { code: MediaError.MEDIA_ERR_ABORTED } :
             e.target.error;
 
         Media.onStatus(media.id, Media.MEDIA_ERROR, err);
     };
 
     node.onended = function () {
-        Media.onStatus(media.id, Media.MEDIA_STATE, Media.MEDIA_STOPPED);
+        if (media.numberOfLoops > 0) {
+            media.numberOfLoops--;
+
+            node.play();
+        }
+        else {
+            Media.onStatus(media.id, Media.MEDIA_STATE, Media.MEDIA_STOPPED);
+        }
     };
 
     if (media.src) {
@@ -115,7 +122,13 @@ Media.MEDIA_MSG = ["None", "Starting", "Running", "Paused", "Stopped"];
 /**
  * Start or resume playing audio file.
  */
-Media.prototype.play = function() {
+Media.prototype.play = function(options) {
+
+    options = options || {};
+
+    if (options.numberOfLoops) {
+        this.numberOfLoops =  options.numberOfLoops - 1;
+    }
 
     // if Media was released, then node will be null and we need to create it again
     if (!this.node) {
