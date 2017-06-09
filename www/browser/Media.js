@@ -139,7 +139,7 @@ Media.prototype.play = function(options) {
         }
     }
 
-    this.node.play();
+    return this.node.play();
 };
 
 /**
